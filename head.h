@@ -1,108 +1,163 @@
 #pragma once
 #include <iostream>
 using namespace std;
-#define OK 1
-#define ERROR -1
+#define MAX_n 1000
+
+typedef int ElemType;
+
+typedef struct CLNode {
+	int i, j;
+	ElemType e;
+	struct CLNode* right, * down;
+}CLNode, * CLink;
 
 typedef struct {
-	char* sv;
-	int len;
-	int size;
-} HStr;
+	CLink* rhead, * chead;
+	int m, n, t;
+} Crosslist;
 
+typedef struct {
+	int i, j, e;
+}Triple;
 
-HStr* InitHStr(char* a) {
-	int i;
-	HStr* T;
-	for (i = 0; a[i] != '\0'; i++);
-	if (!i) return nullptr;
-	else {
-		T = (HStr*)malloc(sizeof(*T));
-		if (!T || !(T->sv=(char*)malloc(sizeof(char) * (i + 1))))	return nullptr;
-		T->len = i;
-		T->size = i + 1;
-		for (int j = 0; j < i; j++) {
-			T->sv[j] = a[j];
-		}
-		T->sv[i] = '\0';
-	}
-	return T;
-}
+void CreateMatrix(Crosslist& C, int m, int n, int t, Triple data[]) {
+	C.m = m;
+	C.n = n;
+	C.t = t;
 
-void StrDelete(HStr* s, int k, int len) {
-	if (!s || !s->sv || k<0 || k + len > s->len || len <= 0) return;
-	int i;
-	for (i = k; i + len < s->len; i++) {
-		s->sv[i] = s->sv[i + len];
-	}
-	s->len = i;
-	s->sv[i] = '\0';
-}
+	C.chead = new CLink[n + 1]();
+	C.rhead = new CLink[m + 1]();
+	if (C.chead == nullptr || C.rhead == nullptr)	return;
 
-int BF_Index_Delete(HStr* s, HStr* t, int pos) {
-	if (!s || !t || pos<0 || pos>s->len)	return ERROR;
-	int i = pos, j = 0;
-	while (i < s->len && j < t->len) {
-		if (s->sv[i] == t->sv[j]) {
-			i++; j++;
+	for (int k = 0;k < t;k++) {
+		int row = data[k].i;
+		int col = data[k].j;
+		int val = data[k].e;
+
+		CLink p = new CLNode;
+		p->i = row;	p->j = col;	p->e = val;
+		p->down = nullptr;	p->right = nullptr;
+		if (C.rhead[row] == nullptr || C.rhead[row]->j > col) {
+			p->right = C.rhead[row];
+			C.rhead[row] = p;
 		}
 		else {
-			i = i - j + 1;
-			j = 0;
+			CLink q = C.rhead[row];
+			for (;q->right && q->right->j < col;q = q->right);
+			p->right = q->right;
+			C.rhead[row]->right = p;
+		}
+
+		if (C.chead[col] == nullptr || C.chead[col]->i > row) {
+			p->down = C.chead[col];
+			C.chead[col] = p;
+		}
+		else {
+			CLink q = C.chead[col];
+			for (;q->down && q->down->i < row;q = q->down);
+			p->down = q->down;
+			C.chead[col]->down = p;
 		}
 	}
-	if (j == t->len) {
-		int startIndex= i - t->len;
-		StrDelete(s, startIndex, t->len);
-		return BF_Index_Delete(s, t, startIndex);
-	}
-	else {
-		return ERROR;
-	}
 }
 
-void Output(HStr* s) {
-	for (int i = 0;i < s->len;i++) {
-		cout << s->sv[i];
-	}
-}
-
-void Get_next(HStr* t, int* next) {
-	int i = 0, j = -1;
-	next[0] = -1;
-	while (i < t->len-1){
-		if (j == -1 || t->sv[i] == t->sv[j])
-		{
-			i++;
-			j++;
-			if (j==0 || t->sv[i] != t->sv[j])	next[i] = j;
-			else   next[i] = next[j];
+void PrintMatrix(Crosslist C) {
+	for (int i = 1;i <= C.m;i++) {
+		CLink p = C.rhead[i];
+		for (int j = 1;j <= C.n;j++) {
+			if (p != nullptr && p->j == j) {
+				cout << p->e << "\t";
+				p = p->right;
+			}
+			else {
+				cout << "0\t";
+			}
 		}
-		else j = next[j];
+		cout << endl;
 	}
 }
 
+void AddMatrix(Crosslist& A, Crosslist B) {
+	int i, j;
+	CLink p, pa, pb, pre, hl[MAX_n + 1];
+	if (A.m != B.m || A.n != B.n)	return;
+	if (B.t == 0)	return;
+	for (j = 1;j <= A.n;j++)	hl[j] = A.chead[j];
+	for (i = 1;i <= A.m;i++) {
+		pa = A.rhead[i];
+		pb = B.rhead[i];
+		pre = nullptr;
 
-int Index_KMP(HStr* s, HStr* t, int pos, int next[]) {
-	if (!s || !t || t->len <= 0 || pos<0 || pos>s->len) return ERROR;
-	int i = pos, j = 0;
-	while (i < s->len && j < t->len) 
-		if (j == -1 || s->sv[i] == t->sv[j]) {
-			++i;   ++j; 
-		} 
-		else j = next[j]; 
-	if (j == t->len) return  i - t->len;
-	else return ERROR;
+		while (pb) {
+			if (pa == nullptr || pa->j > pb->j) {
+				p = new CLNode;
+				if (!pre)	A.rhead[i] = p;
+				else  pre->right = p;
+				p->right = pa;
+				p->i = i;
+				p->j = pb->j;
+				p->e = pb->e;
+
+				if (A.chead[p->j] == nullptr || A.chead[p->j]->i > p->i) {
+					p->down = A.chead[p->j];
+					A.chead[p->j] = p;
+				}
+				else {
+					while (hl[p->j]->down && hl[p->j]->i < p->i) {
+						hl[p->j] = hl[p->j]->down;
+					}
+					p->down = hl[p->j]->down;
+					hl[p->j]->down = p;
+				}
+				hl[p->j] = p;
+				pb = pb->right;
+				A.t++;
+			}
+
+			else if (pa->j < pb->j) {
+				pre = pa;
+				pa = pa->right;
+			}
+
+			else if (pa->e + pb->j != 0) {
+				pa->e += pb->e;
+				pre = pa;
+				pa = pa->right;
+				pb = pb->right;
+			}
+
+			else {
+				if (pre == nullptr)	A.rhead[i] = pa->right;
+				else  pre->right = pa->right;
+
+				p = pa;
+				pa = pa->right;
+				pb = pb->right;
+
+				if (A.chead[p->j] == p)	A.chead[p->j] = p->down;
+				else  hl[p->j]->down = p->down;
+
+				free(p);
+				A.t--;
+			}
+		}
+	}
 }
 
-void KMP_Index_Delete(HStr* s, HStr* t, int pos) {
-	int* next = new int[t->len];
-	Get_next(t, next);
-	int k = Index_KMP(s, t, pos, next);
-	while (k !=ERROR) {
-		StrDelete(s, k, t->len);
-		pos = k;
-		k = Index_KMP(s, t, pos, next);
+void DestroyMatrix(Crosslist& A) {
+	for (int i = 1;i <= A.m;i++) {
+		CLink p = A.rhead[i];
+		while (p != NULL) {
+			CLink temp = p;
+			p = p->right;
+			delete temp;
+		}
+		A.rhead[i] = nullptr;
 	}
-	delete[] next;
+	delete[] A.rhead;
+	delete[] A.chead;
+
+	A.rhead = nullptr;
+	A.chead = nullptr;
+	A.m = A.n = A.t = 0;
 }
